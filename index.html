@@ -94,3 +94,76 @@
 
     <label>Pickup Location</label>
     <input id="pickup" placeholder="Enter pickup address">
+
+    <label>Dropoff Location</label>
+    <input id="dropoff" placeholder="Enter dropoff address">
+
+    <button onclick="calculateTow()">Calculate Tow</button>
+
+    <div id="results">
+        <div class="result-line" id="pickupDisplay"></div>
+        <div class="result-line" id="dropoffDisplay"></div>
+        <div class="result-line" id="distanceDisplay"></div>
+        <div class="result-line" id="priceDisplay"></div>
+    </div>
+</div>
+
+<script>
+async function geocode(address) {
+    const url = "https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(address);
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.length === 0) return null;
+    return { lat: data[0].lat, lon: data[0].lon, display: data[0].display_name };
+}
+
+async function getDrivingDistance(pickup, dropoff) {
+    const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=false`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!data.routes || data.routes.length === 0) return null;
+    return data.routes[0].distance / 1609.34; // meters → miles
+}
+
+function shortenAddress(full) {
+    const parts = full.split(",");
+    return parts.slice(0, 2).join(",").trim();
+}
+
+async function calculateTow() {
+    const pickupInput = document.getElementById("pickup").value.trim();
+    const dropoffInput = document.getElementById("dropoff").value.trim();
+
+    if (!pickupInput || !dropoffInput) {
+        alert("Enter both pickup and dropoff addresses.");
+        return;
+    }
+
+    const pickup = await geocode(pickupInput);
+    const dropoff = await geocode(dropoffInput);
+
+    if (!pickup || !dropoff) {
+        alert("One or both addresses could not be found.");
+        return;
+    }
+
+    const miles = await getDrivingDistance(pickup, dropoff);
+    if (!miles) {
+        alert("Unable to calculate driving distance.");
+        return;
+    }
+
+    const rate = 4.00;
+    const price = miles * rate;
+
+    document.getElementById("pickupDisplay").innerText = "Pickup: " + shortenAddress(pickup.display);
+    document.getElementById("dropoffDisplay").innerText = "Dropoff: " + shortenAddress(dropoff.display);
+    document.getElementById("distanceDisplay").innerText = "Distance: " + miles.toFixed(1) + " miles";
+    document.getElementById("priceDisplay").innerText = "Price: $" + price.toFixed(2);
+
+    document.getElementById("results").style.display = "block";
+}
+</script>
+
+</body>
+</html>
