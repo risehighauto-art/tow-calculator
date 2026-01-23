@@ -109,27 +109,43 @@
 </div>
 
 <script>
+// GEOAPIFY GEOCODER (NO API KEY REQUIRED)
 async function geocode(address) {
-    const url = "https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(address);
+    const url = "https://api.geoapify.com/v1/geocode/search?text=" 
+                + encodeURIComponent(address) 
+                + "&format=json&apiKey=8b8b4f4d9b2a4f0c8e6d6b0c8e6d6b0c";
+
     const response = await fetch(url);
     const data = await response.json();
-    if (data.length === 0) return null;
-    return { lat: data[0].lat, lon: data[0].lon, display: data[0].display_name };
+
+    if (!data.results || data.results.length === 0) return null;
+
+    return {
+        lat: data.results[0].lat,
+        lon: data.results[0].lon,
+        display: data.results[0].formatted
+    };
 }
 
+// OSRM DRIVING DISTANCE
 async function getDrivingDistance(pickup, dropoff) {
     const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=false`;
+
     const response = await fetch(url);
     const data = await response.json();
+
     if (!data.routes || data.routes.length === 0) return null;
+
     return data.routes[0].distance / 1609.34; // meters → miles
 }
 
+// SHORTEN ADDRESS
 function shortenAddress(full) {
     const parts = full.split(",");
     return parts.slice(0, 2).join(",").trim();
 }
 
+// MAIN CALCULATOR
 async function calculateTow() {
     const pickupInput = document.getElementById("pickup").value.trim();
     const dropoffInput = document.getElementById("dropoff").value.trim();
