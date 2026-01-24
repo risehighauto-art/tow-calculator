@@ -1,185 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RoadTek Tow Calculator</title>
-
-<style>
+  <meta charset="UTF-8" />
+  <title>RoadTek Tow Calculator</title>
+  <style>
     body {
-        font-family: Arial, sans-serif;
-        background: #111;
-        color: white;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        min-height: 100vh;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
     }
-
+    h2 {
+      text-align: center;
+      color: #222;
+    }
     .container {
-        width: 90%;
-        max-width: 420px;
-        background: #1a1a1a;
-        padding: 25px;
-        margin-top: 40px;
-        border-radius: 12px;
-        box-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
-        border: 1px solid #333;
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-
-    h1 {
-        text-align: center;
-        margin-bottom: 20px;
-        color: #ff3333;
-        font-size: 26px;
-        letter-spacing: 1px;
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
     }
-
-    label {
-        font-size: 14px;
-        margin-bottom: 5px;
-        display: block;
-        color: #ccc;
-    }
-
-    input {
-        width: 100%;
-        padding: 12px;
-        margin-bottom: 18px;
-        border: none;
-        border-radius: 8px;
-        background: #2a2a2a;
-        color: white;
-        font-size: 15px;
-    }
-
     button {
-        width: 100%;
-        padding: 14px;
-        background: #ff3333;
-        border: none;
-        border-radius: 8px;
-        color: white;
-        font-size: 17px;
-        cursor: pointer;
-        font-weight: bold;
-        letter-spacing: 0.5px;
+      background: #000;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
     }
-
     button:hover {
-        background: #ff5555;
+      background: #333;
     }
-
-    #results {
-        margin-top: 25px;
-        padding: 20px;
-        background: #222;
-        border-radius: 10px;
-        display: none;
-        border: 1px solid #333;
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e9ffe9;
+      border-left: 5px solid #00a000;
+      border-radius: 6px;
     }
-
-    .result-line {
-        margin-bottom: 10px;
-        font-size: 16px;
-    }
-</style>
+  </style>
 </head>
 
 <body>
-<div class="container">
-    <h1>RoadTek Tow Calculator</h1>
+  <div class="container">
+    <h2>RoadTek Tow Price Calculator</h2>
 
-    <label>Pickup Location</label>
-    <input id="pickup" placeholder="Enter pickup address">
+    <input id="pickup" type="text" placeholder="Enter Pickup Address" />
+    <input id="dropoff" type="text" placeholder="Enter Dropoff Address" />
 
-    <label>Dropoff Location</label>
-    <input id="dropoff" placeholder="Enter dropoff address">
+    <button onclick="calculatePrice()">Calculate Price</button>
 
-    <button onclick="calculateTow()">Calculate Tow</button>
+    <div id="output" class="result" style="display:none;"></div>
+  </div>
 
-    <div id="results">
-        <div class="result-line" id="pickupDisplay"></div>
-        <div class="result-line" id="dropoffDisplay"></div>
-        <div class="result-line" id="distanceDisplay"></div>
-        <div class="result-line" id="priceDisplay"></div>
-    </div>
-</div>
+  <script>
+    let pickupAutocomplete, dropoffAutocomplete;
 
-<script>
-// GEOAPIFY GEOCODER (NO API KEY REQUIRED)
-async function geocode(address) {
-    const url = "https://api.geoapify.com/v1/geocode/search?text=" 
-                + encodeURIComponent(address) 
-                + "&format=json&apiKey=8b8b4f4d9b2a4f0c8e6d6b0c8e6d6b0c";
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.results || data.results.length === 0) return null;
-
-    return {
-        lat: data.results[0].lat,
-        lon: data.results[0].lon,
-        display: data.results[0].formatted
-    };
-}
-
-// OSRM DRIVING DISTANCE
-async function getDrivingDistance(pickup, dropoff) {
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=false`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.routes || data.routes.length === 0) return null;
-
-    return data.routes[0].distance / 1609.34; // meters → miles
-}
-
-// SHORTEN ADDRESS
-function shortenAddress(full) {
-    const parts = full.split(",");
-    return parts.slice(0, 2).join(",").trim();
-}
-
-// MAIN CALCULATOR
-async function calculateTow() {
-    const pickupInput = document.getElementById("pickup").value.trim();
-    const dropoffInput = document.getElementById("dropoff").value.trim();
-
-    if (!pickupInput || !dropoffInput) {
-        alert("Enter both pickup and dropoff addresses.");
-        return;
+    function initAutocomplete() {
+      pickupAutocomplete = new google.maps.places.Autocomplete(
+        document.getElementById("pickup")
+      );
+      dropoffAutocomplete = new google.maps.places.Autocomplete(
+        document.getElementById("dropoff")
+      );
     }
 
-    const pickup = await geocode(pickupInput);
-    const dropoff = await geocode(dropoffInput);
+    function calculatePrice() {
+      const pickup = document.getElementById("pickup").value;
+      const dropoff = document.getElementById("dropoff").value;
 
-    if (!pickup || !dropoff) {
-        alert("One or both addresses could not be found.");
+      if (!pickup || !dropoff) {
+        alert("Please enter both pickup and dropoff addresses.");
         return;
+      }
+
+      const service = new google.maps.DistanceMatrixService();
+
+      service.getDistanceMatrix(
+        {
+          origins: [pickup],
+          destinations: [dropoff],
+          travelMode: "DRIVING",
+        },
+        function (response, status) {
+          if (status !== "OK") {
+            alert("Error calculating distance.");
+            return;
+          }
+
+          const distanceText = response.rows[0].elements[0].distance.text;
+          const miles = parseFloat(distanceText.replace(" mi", ""));
+
+          // Pricing rules
+          const basePrice = 160;
+          const includedMiles = 25;
+          const extraRate = 2;
+
+          let extraMiles = Math.max(0, miles - includedMiles);
+          let extraCost = extraMiles * extraRate;
+
+          // After-hours fee (Central Time)
+          const now = new Date();
+          const centralTime = new Date(
+            now.toLocaleString("en-US", { timeZone: "America/Chicago" })
+          );
+          const hour = centralTime.getHours();
+
+          let afterHoursFee = 0;
+          if (hour < 7 || hour >= 23) {
+            afterHoursFee = 50;
+          }
+
+          const total = basePrice + extraCost + afterHoursFee;
+
+          document.getElementById("output").style.display = "block";
+          document.getElementById("output").innerHTML = `
+            <strong>Distance:</strong> ${miles.toFixed(2)} miles<br>
+            <strong>Base Price:</strong> $${basePrice}<br>
+            <strong>Extra Miles:</strong> ${extraMiles.toFixed(2)} × $2 = $${extraCost.toFixed(2)}<br>
+            <strong>After Hours Fee:</strong> $${afterHoursFee}<br><br>
+            <strong style="font-size:20px;">Total Price: $${total.toFixed(2)}</strong>
+          `;
+        }
+      );
     }
+  </script>
 
-    const miles = await getDrivingDistance(pickup, dropoff);
-    if (!miles) {
-        alert("Unable to calculate driving distance.");
-        return;
-    }
-
-    const rate = 4.00;
-    const price = miles * rate;
-
-    document.getElementById("pickupDisplay").innerText = "Pickup: " + shortenAddress(pickup.display);
-    document.getElementById("dropoffDisplay").innerText = "Dropoff: " + shortenAddress(dropoff.display);
-    document.getElementById("distanceDisplay").innerText = "Distance: " + miles.toFixed(1) + " miles";
-    document.getElementById("priceDisplay").innerText = "Price: $" + price.toFixed(2);
-
-    document.getElementById("results").style.display = "block";
-}
-</script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBZn5Kj4Um3O4PL1Pcc5XuLY_iLvueqxrc&libraries=places&callback=initAutocomplete" async defer></script>
 
 </body>
 </html>
